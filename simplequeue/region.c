@@ -85,8 +85,13 @@ void region_free(void *ptr)
                 TAILQ_REMOVE(&regions, reg, entries);
                 munmap((void *)reg, region_size);
             }
-            break;
+            return;
         }
         reg = TAILQ_NEXT(reg, entries);
     }
+    /*
+     * This item is not within a region. Assume this was allocated via malloc.
+     *
+     */
+    free(ptr);
 }
