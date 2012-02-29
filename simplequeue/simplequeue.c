@@ -8,6 +8,11 @@
 
 #define VERSION "1.3.1"
 
+/* region.c */
+extern void region_init(size_t pages_per_region);
+extern void *region_alloc(size_t size);
+extern void region_free(void *ptr);
+
 void exit_cb(struct evhttp_request *req, struct evbuffer *evb, void *ctx);
 
 struct queue_entry {
@@ -60,7 +65,7 @@ void overflow_one()
         n_bytes -= entry->bytes;
         depth--;
         n_overflow++;
-        free(entry);
+        region_free(entry);
     }
 }
 
@@ -121,7 +126,7 @@ void get(struct evhttp_request *req, struct evbuffer *evb, void *ctx)
     if (entry != NULL) {
         n_bytes -= entry->bytes;
         evbuffer_add_printf(evb, "%s", entry->data);
-        free(entry);
+        region_free(entry);
     }
     
     evhttp_send_reply(req, HTTP_OK, "OK", evb);
@@ -167,7 +172,7 @@ void mget(struct evhttp_request *req, struct evbuffer *evb, void *ctx)
         if (i < (num_items - 1)) {
             evbuffer_add_printf(evb, "%s", separator);
         }
-        free(entry);
+        region_free(entry);
     }
     
     evhttp_send_reply(req, HTTP_OK, "OK", evb);
@@ -181,7 +186,8 @@ void put_queue_entry(const char *data, size_t record_size)
     // don't put empty records on the queue
     if (record_size > 0) {
         // copy the record
-        entry = malloc(sizeof(*entry) + record_size + 1);
+        //entry = malloc(sizeof(*entry) + record_size + 1);
+        entry = region_alloc(sizeof(*entry) + record_size + 1);
         strncpy(entry->data, data, record_size);
         entry->data[record_size] = '\0';
         entry->bytes = record_size;
@@ -335,6 +341,7 @@ int main(int argc, char **argv)
     option_define_int("max_depth", OPT_OPTIONAL, 0, NULL, NULL, "maximum items in queue");
     option_define_bool("version", OPT_OPTIONAL, 0, NULL, version_cb, VERSION);
     option_define_int("max_mget", OPT_OPTIONAL, 0, NULL, NULL, "maximum items to return in a single mget");
+    option_define_int("pages_per_region", OPT_OPTIONAL, 16, NULL, NULL, "number of pages per region mmap");
     
     if (!option_parse_command_line(argc, argv)) {
         return 1;
@@ -354,6 +361,7 @@ int main(int argc, char **argv)
     
     fprintf(stderr, "Version: %s, http://code.google.com/p/simplehttp/\n", VERSION);
     fprintf(stderr, "use --help for options\n");
+    region_init((size_t)option_get_int("pages_per_region"));
     simplehttp_init();
     signal(SIGHUP, hup_handler);
     simplehttp_set_cb("/put*", put, NULL);

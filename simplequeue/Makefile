@@ -5,10 +5,10 @@ LIBSIMPLEHTTP_INC ?= $(LIBSIMPLEHTTP)/..
 LIBSIMPLEHTTP_LIB ?= $(LIBSIMPLEHTTP)
 
 CFLAGS = -I$(LIBSIMPLEHTTP_INC) -I$(LIBEVENT)/include -Wall -g
-LIBS = -L$(LIBSIMPLEHTTP_LIB) -L$(LIBEVENT)/lib -levent -lsimplehttp -lm
+LIBS = -L$(LIBSIMPLEHTTP_LIB) -L$(LIBEVENT)/lib -levent -lsimplehttp -lm -ljemalloc
 
-simplequeue: simplequeue.c
-	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+simplequeue: simplequeue.c region.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 install:
 	/usr/bin/install -d $(TARGET)/bin
