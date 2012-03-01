@@ -26,21 +26,35 @@ TAILQ_HEAD(region_list, region) regions;
 
 static long page_size;
 static long region_size;
+static int nregions = 0;
 
 #define ALIGN_BYTES 8
 #define PAD(o,a) ((-o) & (a - 1))
 
 static struct region *new_region()
 {
-    struct region *reg = (struct region *)mmap(NULL, region_size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+    struct region *reg;
+    void *start_addr;
+
+    /*
+     * Mapped memory is not always reclaimed on centos. I am setting the
+     * start address of the mapped region in an attempt to avoid interleaving
+     * with heap allocations - this is probably total bullshit.
+     *
+     */
+    start_addr = (void *)0xa00000;
+    start_addr += region_size*nregions;
+    reg = (struct region *)mmap(start_addr, region_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
     if (reg == MAP_FAILED) {
         fprintf(stderr, "mmap() failed: %s\n", strerror(errno));
         return NULL;
     }
+    fprintf(stderr, "mmap() %p %ld\n", reg, region_size);
     posix_madvise(reg, region_size, POSIX_MADV_SEQUENTIAL);
     reg->ref_count = 0;
     reg->write_head = reg->data + PAD(sizeof(struct region), ALIGN_BYTES);
     TAILQ_INSERT_TAIL(&regions, reg, entries);
+    nregions++;
     return reg;
 }
 
@@ -65,7 +79,7 @@ void *region_alloc(size_t size)
     if (aligned_size > (region_size >> 6)) {
         return malloc(size + PAD(size, page_size));
     }
-    if (!reg || (reg->write_head - (void *)reg) < aligned_size) {
+    if (!reg || (region_size - (reg->write_head - (void *)reg)) < aligned_size) {
         reg = new_region();
     }
     ptr = reg->write_head;
@@ -83,7 +97,11 @@ void region_free(void *ptr)
         if (ptr > (void *)reg && ptr < ((void *)reg + region_size)) {
             if (--reg->ref_count == 0) {
                 TAILQ_REMOVE(&regions, reg, entries);
-                munmap((void *)reg, region_size);
+                fprintf(stderr, "munmap() %p\n", reg);
+                if (munmap((void *)reg, region_size) != 0) {
+                    fprintf(stderr, "munmap() failed: %s\n", strerror(errno));
+                }
+                nregions--;
             }
             return;
         }

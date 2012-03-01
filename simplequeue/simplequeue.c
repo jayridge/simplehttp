@@ -341,7 +341,7 @@ int main(int argc, char **argv)
     option_define_int("max_depth", OPT_OPTIONAL, 0, NULL, NULL, "maximum items in queue");
     option_define_bool("version", OPT_OPTIONAL, 0, NULL, version_cb, VERSION);
     option_define_int("max_mget", OPT_OPTIONAL, 0, NULL, NULL, "maximum items to return in a single mget");
-    option_define_int("pages_per_region", OPT_OPTIONAL, 16, NULL, NULL, "number of pages per region mmap");
+    option_define_int("pages_per_region", OPT_OPTIONAL, 256, NULL, NULL, "number of pages per region mmap");
     
     if (!option_parse_command_line(argc, argv)) {
         return 1;
