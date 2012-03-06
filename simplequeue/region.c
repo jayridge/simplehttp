@@ -44,7 +44,7 @@ static struct region *new_region()
      */
     start_addr = (void *)0xa00000;
     start_addr += region_size*nregions;
-    reg = (struct region *)mmap(start_addr, region_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+    reg = (struct region *)mmap(start_addr, region_size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
     if (reg == MAP_FAILED) {
         fprintf(stderr, "mmap() failed: %s\n", strerror(errno));
         return NULL;
@@ -68,8 +68,9 @@ void region_init(size_t pages_per_region)
 void *region_alloc(size_t size)
 {
     void *ptr;
+    size_t padding = PAD(size, ALIGN_BYTES);
+    size_t aligned_size = size + padding;
     struct region *reg = TAILQ_LAST(&regions, region_list);
-    size_t aligned_size = size + PAD(size, ALIGN_BYTES);
 
     /*
      * Requests larger than 1/64th of the region are malloc'd
@@ -82,7 +83,7 @@ void *region_alloc(size_t size)
     if (!reg || (region_size - (reg->write_head - (void *)reg)) < aligned_size) {
         reg = new_region();
     }
-    ptr = reg->write_head;
+    ptr = reg->write_head + padding;
     reg->ref_count += 1;
     reg->write_head += aligned_size;
     return ptr;
